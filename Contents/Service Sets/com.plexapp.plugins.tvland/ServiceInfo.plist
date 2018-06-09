@@ -8,7 +8,7 @@
 		<dict>
 			<key>URLPatterns</key>
 			<array>
-				<string>^http:\/\/www\.tvland\.com\/(full\-episodes|video\-clips)\/\w{6,}\/.+</string>
+				<string>^http:\/\/www\.tvland\.com\/((full\-)?episodes|video\-clips)\/\w{6,}\/.+</string>
 				<string>^http:\/\/www\.tvland\.com\/video\/\?v?id=\d{6,7}</string>
 			</array>
 		</dict>
