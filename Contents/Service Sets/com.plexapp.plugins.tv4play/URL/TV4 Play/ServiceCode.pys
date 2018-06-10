@@ -126,52 +126,20 @@ def GetURLs(id):
         
     headers = {}
     headers['User-Agent'] = USER_AGENT
-    
-    is_live = IsLive(id)
-    
-    if not is_live:
-        try:
-            xmlElement = XML.ElementFromURL(
-                url = API_VIDEO_URL % ('/api/web/asset/' + str(id) + '/play'),
-                headers = headers
-            )
-        except:
-            pass
-    else:
-        try:
-            xmlElement = XML.ElementFromURL(
-                url = API_VIDEO_URL % ('/api/html5/asset/' + str(id) + '/play?videoFormat=livehls'),
-                headers = headers
-            ) 
-        except: 
-            pass   
 
-    if xmlElement:
-        hls_url  = None
-        subs_url = None
+    stream_url = "https://playback-api.b17g.net/media/" + str(id) + "?service=tv4&device=browser&protocol=hls%2Cdash&drm=widevine";
 
-        for item in xmlElement.xpath("//playback//items//item"):
-            url         = item.xpath(".//url/text()")[0]
-            mediaFormat = item.xpath(".//mediaFormat/text()")[0]
-            
-            if url.startswith('http') and (('.m3u8' in url) or ('.f4m' in url)):
-                if '.f4m' in url:
-                    url = url.replace('tv4playhds-f.akamaihd.net/z/', 'tv4play-i.akamaihd.net/i/').replace('manifest.f4m', 'master.m3u8')
-                
-                if mediaFormat == 'mp4' or mediaFormat == 'livehls':
-                    hls_url = GetClientDependentURL(url)
-                    
-                elif mediaFormat == 'webvtts':
-                    subs_url = url
-            
-            if hls_url and subs_url:
-                return hls_url, subs_url
+    if IsLive(id):
+        stream_url = stream_url + "&is_live=true"
+
+
         
-        if hls_url:
-            return hls_url, None
-    
-        if is_live and xmlElement.xpath("//playback//playbackStatus/text()")[0] == 'NOT_STARTED':
-            raise Ex.LiveMediaNotStarted
+    try:
+        hls_url = JSON.ObjectFromURL(stream_url)['playbackItem']['manifestUrl']
+        return hls_url, None
+
+    except:
+        pass
 
     raise Ex.MediaNotAvailable
 
