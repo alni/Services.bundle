@@ -1,36 +1,39 @@
 VIDEO_INFO = 'http://teamcoco.com/api/5/apps/cvp/%s.xml'
 RE_BANDWIDTH = Regex('BANDWIDTH=(\d+)')
-FULL_EP_RES = [480]
+FULL_EP_RES = [720]
 VIDEO_RES = [1080, 720, 480]
+
+RE_THUMB = Regex('"preview":"([^"]+)')
+RE_MEDIA_ID = Regex('"turnerMediaId":"([^"]+)')
+RE_TOKEN = Regex('"turnerMediaAuthToken":"([^"]+)')
+
+FULL_EP_INFO_URL = 'http://medium.ngtv.io/media/%s/desktop'
+FULL_EP_TOKEN_URL = 'http://token.ngtv.io/token/token_spe?format=json&path=/tbs/%s/*&accessTokenType=jws&accessToken=%s'
+
+####################################################################################################
+def NormalizeURL(url):
+
+	return url.split('?')[0]
 
 ####################################################################################################
 def MetadataObjectForURL(url):
 
-	video_id = GetVideoId(url)
+	page = HTTP.Request(url).content
+	html = HTML.ElementFromString(page)
 
-	if not video_id:
-		Log.Exception("Could not retrieve video_id in MetadataObjectForURL")
-		raise Ex.MediaNotAvailable
+	title = html.xpath('//meta[@property="og:title"]/@content')[0]
+	summary = html.xpath('//meta[@property="og:description"]/@content')[0]
 
-	xml = XML.ElementFromURL(VIDEO_INFO % (video_id), cacheTime=CACHE_1HOUR)
-	title = xml.xpath('//headline/text()')[0]
-	summary = String.StripTags(xml.xpath('//description/text()')[0]).strip()
+	thumb = RE_THUMB.search(page)
 
-	duration = xml.xpath('//video/@duration')
-	duration = Datetime.MillisecondsFromString(duration[0]) if len(duration) > 0 and duration[0] != "" else None
-
-	try:
-		thumb = xml.xpath('//image[@width="640"]/text()')[0]
-	except:
-		try:
-			thumb = xml.xpath('//image/text()')[-1]
-		except:
-			thumb = ''
+	if thumb:
+		thumb = thumb.group(1)
+	else:
+		thumb = ''
 
 	return VideoClipObject(
-		title = String.DecodeHTMLEntities(title),
-		summary = String.DecodeHTMLEntities(summary),
-		duration = duration,
+		title = title,
+		summary = summary,
 		thumb = Resource.ContentsOfURLWithFallback(url=thumb)
 	)
 
@@ -67,65 +70,34 @@ def MediaObjectsForURL(url):
 		]
 
 ####################################################################################################
+@indirect
 def PlayEpisode(url, res, **kwargs):
 
 	if not '/full-episode-' in url:
 		raise Ex.MediaNotAvailable
 
-	video_id = GetVideoId(url)
+	page = HTTP.Request(url).content
 
-	if not video_id:
-		Log.Exception("Could not retrieve video_id in PlayEpisode")
-		raise Ex.MediaExpired
+	media_id = RE_MEDIA_ID.search(page)
+	token = RE_TOKEN.search(page)
 
-	xml = XML.ElementFromURL(VIDEO_INFO % (video_id), cacheTime=CACHE_1HOUR)
-
-	if len(xml.xpath('//files/file')) < 1:
+	if not media_id or not token:
 		raise Ex.MediaNotAvailable
 
-	src = xml.xpath('//files/file[@bitrate="ipad"]/text()|//files/file[contains(text(), "ipad")]/text()')[0]
-	m3u8_url = 'http://ht.cdn.turner.com/tbs/big/teamcoco/%s' % (src.lstrip('/'))
-	base_url = m3u8_url.rsplit('/',1)[0]
+	json_media_obj = JSON.ObjectFromURL(FULL_EP_INFO_URL % (media_id.group(1)))['media']['desktop']['bulkaes']
+	video_url = json_media_obj['url']
+	asset_id = json_media_obj['assetId']
 
-	try:
-		playlist = HTTP.Request(m3u8_url).content
-	except Ex.HTTPError, e:
-		if e.code == 404:
-			raise Ex.MediaNotAvailable
+	json_token_obj = JSON.ObjectFromURL(FULL_EP_TOKEN_URL % (asset_id, token.group(1)))
+	video_url_token = json_token_obj['auth']['token']
 
-	new_playlist = '#EXTM3U'
-	streams = []
-	bandwidth = None
+	full_ep_video_url = '%s?hdnts=%s' % (video_url, video_url_token)
 
-	for line in playlist.splitlines(False)[1:]:
-		if line.startswith('#'):
-			bandwidth = RE_BANDWIDTH.search(line)
-			previous_line = line
-			continue
-		elif len(line) < 1:
-			continue
-		else:
-			if not bandwidth:
-				continue
-			if not line.startswith('http://'):
-				line = '%s/%s' % (base_url, line)
-
-			streams.append({
-				'bandwidth': int(bandwidth.group(1)),
-				'stream': '%s\n%s' % (previous_line, line)
-			})
-
-	sorted_streams = sorted(streams, key=lambda stream: stream['bandwidth'])
-
-	# Throw away the audio-only stream
-	for stream in sorted_streams[1:]:
-		new_playlist += '\n%s' % (stream['stream'])
-
-	return new_playlist
+	return IndirectResponse(VideoClipObject, key=HTTPLiveStreamURL(full_ep_video_url))
 
 ####################################################################################################
 @indirect
-def PlayVideo(url, res=720, **kwargs):
+def PlayVideo(url, res=1080, **kwargs):
 
 	video_id = GetVideoId(url)
 
@@ -138,7 +110,7 @@ def PlayVideo(url, res=720, **kwargs):
 	if len(xml.xpath('//files/file')) < 1:
 		raise Ex.MediaNotAvailable
 
-	hd_1080 = video_url = xml.xpath('//file[@bitrate="other" and contains(., "1080")]/text()')
+	hd_1080 = video_url = xml.xpath('//file[@bitrate="uhd"]/text()')
 	hd_720 = video_url = xml.xpath('//file[@bitrate="hd"]/text()')
 	sd_360 = video_url = xml.xpath('//file[@bitrate="embed"]/text()')
 
@@ -161,4 +133,4 @@ def GetVideoId(url):
 	if len(video_id) > 0:
 		return video_id[0].split('/')[-1]
 	else:
-		raise Ex.MediaNotAvailable
+		return None
