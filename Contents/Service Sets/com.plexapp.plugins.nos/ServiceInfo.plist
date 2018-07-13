@@ -8,7 +8,7 @@
 		<dict>
 			<key>URLPatterns</key>
 			<array>
-				<string>^http:\/\/nos\.nl\/([^/]+\/)?(uitzending|video)\/\d+\-.+\.html</string>
+				<string>^https:\/\/nos\.nl\/uitzending\/\d+\-.+\.html</string>
 			</array>
 		</dict>
 	</dict>
