@@ -42,8 +42,8 @@ def MetadataObjectForURL(url):
     summary = json_obj['description'] if 'description' in json_obj else None
     thumb = json_obj['thumbnails'][0]['url'] if 'thumbnails' in json_obj else None
     show = json_obj['pl1$show'] if 'pl1$show' in json_obj else None
-    season = int(json_obj['pl1$season']) if 'pl1$season' in json_obj and json_obj['pl1$season'] != "Special" else None
-    index = int(json_obj['pl1$episode']) if 'pl1$episode' in json_obj else None
+    season = int(json_obj['pl1$season']) if 'pl1$season' in json_obj and json_obj['pl1$season'].isdigit() else None
+    index = int(json_obj['pl1$episode']) if 'pl1$episode' in json_obj and json_obj['pl1$episode'].isdigit() else None
     originally_available_at = Datetime.FromTimestamp(json_obj['pubDate'] / 1000).date() if 'pubDate' in json_obj else None
 
     duration = None
