@@ -23,7 +23,7 @@ def MetadataObjectForURL(url):
     title = json_root['title']
     description = json_root['media-content']['media-description']
     duration = json_root['media-content']['mvn-duration']
-    duration = int(duration) * 60 * 1000
+    duration = int(duration) * 1000
     date = json_root['media-content']['mvn-airDate']
     date = Datetime.ParseDate(date)
     thumb_url = json_root['media-content']['mvn-fnc_grab_320x240']
