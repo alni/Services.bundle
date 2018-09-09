@@ -62,7 +62,9 @@ def MediaObjectsForURL(url):
 
 		media_url = item['group']['content'].replace('{device}', 'iPad') + '&format=json'
 		if media_url.startswith('//'):
-			media_url = 'https:' + media_url
+			media_url = 'http:' + media_url
+		elif media_url.startswith('https://'):
+			media_url = media_url.replace('https://', 'http://')
 
 		json_obj = JSON.ObjectFromURL(media_url, cacheTime=CACHE_1HOUR)
 
