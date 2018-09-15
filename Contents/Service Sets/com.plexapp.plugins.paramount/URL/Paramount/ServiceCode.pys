@@ -1,9 +1,9 @@
 MRSS_URL = 'http://www.paramountnetwork.com/feeds/mrss?uri=%s&isEpisode=true'
 NAMESPACES = {'media': 'http://search.yahoo.com/mrss/'}
 
-MGID_FORMAT = 'mgid:arc:paramountnetwork.com:%s:%s'
-RE_MANIFEST_FEED = Regex('var triforceManifestFeed = (.+?);', Regex.DOTALL)
 RE_B = Regex('(&__b__=)\d+')
+RE_JSON = Regex('window.__DATA__ = (.+?)\n', Regex.DOTALL)
+RE_MGID = Regex('config":{"uri":"(.+?)",', Regex.DOTALL)
 
 ####################################################################################################
 def NormalizeURL(url):
@@ -108,17 +108,14 @@ def GetRSS(url):
 
     try:
         content = HTTP.Request(url).content
-        json = JSON.ObjectFromString(RE_MANIFEST_FEED.search(content).group(1))
     except:
         raise Ex.MediaNotAvailable
 
-    video_id = json['manifest']['reporting']['itemId']
-    # The page type is either ENT_P006 - full episode player or ENT_P008 - video clip player
-    page_type = json['manifest']['type']
-    if 'ENT_P006' in page_type:
-        mgid = MGID_FORMAT %('episode', video_id)
-    else:
-        mgid = MGID_FORMAT %('video', video_id)
+    try:
+        mgid = RE_MGID.search(content).group(1)
+    except:
+        try: mgid = JSON.ObjectFromString(RE_JSON.search(content).group(1))['children'][3]['props']['media']['video']['config']['uri']
+        except: mgid = None
 
     # Find the host and build the mgid
     if mgid:
