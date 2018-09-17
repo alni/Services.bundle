@@ -1,7 +1,9 @@
-RE_VIDEO_ID = Regex("id: '(\d+)'")
-RE_VIDEO_URL = Regex('recommended_encoding.*"url": "([^"]+)"', Regex.DOTALL)
+import ssl, urllib2
 
-PLAYER_URL = 'http://player.pbs.org/portalplayer/%s/'
+RE_VIDEO_ID = Regex("id: '(\d+)'")
+RE_VIDEO_DATA = Regex("window\.videoBridge = (\{[^;]+\})")
+
+PLAYER_URL = 'https://player.pbs.org/portalplayer/{}/'
 
 ####################################################################################################
 def NormalizeURL(url):
@@ -11,7 +13,7 @@ def NormalizeURL(url):
 ####################################################################################################
 def MetadataObjectForURL(url):
 
-    html = HTML.ElementFromURL(url)
+    html = HTML.ElementFromString(GetData(url))
 
     title = html.xpath('//meta[@property="og:title"]/@content')[0].split(' | ')[0]
     summary = html.xpath('//meta[@property="og:description"]/@content')[0]
@@ -66,16 +68,45 @@ def MediaObjectsForURL(url):
 @indirect
 def PlayVideo(url, **kwargs):
 
-    page = HTTP.Request(url).content
+    page = GetData(url)
     video_id = RE_VIDEO_ID.search(page).group(1)
 
-    page = HTTP.Request(PLAYER_URL % (video_id)).content
-    redirect_url = RE_VIDEO_URL.search(page).group(1).replace('https://', 'http://')
+    page = GetData(PLAYER_URL.format(video_id))
+    video_data = RE_VIDEO_DATA.search(page).group(1)
+    json_obj = JSON.ObjectFromString(video_data)
 
-    json_obj = JSON.ObjectFromURL('%s?format=json' % (redirect_url))
+    video_url_mp4 = None
+    video_url_m3u8 = None
 
-    if 'status' in json_obj and json_obj['status'] == 'ok':
-        video_url = json_obj['url'].replace('-16x9-720p.m3u8', '-mp4-720p-3000k.mp4')
+    for encoding_url in json_obj['encodings']:
+
+        json_encoding_obj = JSON.ObjectFromString(GetData('{}?format=json'.format(encoding_url)))
+        video_url = json_encoding_obj['url']
+
+        if '.mp4' in video_url:
+            video_url_mp4 = video_url
+        elif '.m3u8' in video_url:
+            video_url_m3u8 = video_url
+
+    if video_url_mp4:
+        return IndirectResponse(VideoClipObject, key=video_url_mp4)
+    elif video_url_m3u8:
+        video_url = video_url_m3u8.replace('-16x9-720p.m3u8', '-mp4-720p-3000k.mp4')
         return IndirectResponse(VideoClipObject, key=video_url)
     else:
         raise Ex.MediaNotAvailable
+
+####################################################################################################
+def GetData(url, add_headers={}):
+
+    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/11.1.2 Safari/605.1.15"}
+    headers.update(add_headers)
+
+    # Quick and dirty workaround
+    # Do not validate ssl certificate
+    # http://stackoverflow.com/questions/27835619/ssl-certificate-verify-failed-error
+    req = urllib2.Request(url, headers=headers)
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+    data = urllib2.urlopen(req, context=ssl_context).read()
+
+    return data
