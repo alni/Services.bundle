@@ -1,5 +1,6 @@
 STREAM_DATA = 'https://api.twitch.tv/kraken/streams/%s'
-HLS_TOKEN_URL = 'http://api.twitch.tv/api/channels/%s/access_token'
+#HLS_TOKEN_URL = 'http://api.twitch.tv/api/channels/%s/access_token'
+HLS_TOKEN_URL = 'https://api.twitch.tv/api/channels/%s/access_token'
 HLS_PLAYLIST_URL = 'http://usher.twitch.tv/api/channel/hls/%s.m3u8?token=%s&sig=%s'
 
 HTTP_HEADERS = {
